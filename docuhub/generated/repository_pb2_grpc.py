@@ -74,6 +74,11 @@ class RepositoryServiceStub(object):
                 request_serializer=repository__pb2.MergeRepoRequest.SerializeToString,
                 response_deserializer=repository__pb2.MergeRepoResponse.FromString,
                 _registered_method=True)
+        self.CloneRepo = channel.unary_unary(
+                '/repository.RepositoryService/CloneRepo',
+                request_serializer=repository__pb2.CloneRepoRequest.SerializeToString,
+                response_deserializer=repository__pb2.CloneRepoResponse.FromString,
+                _registered_method=True)
 
 
 class RepositoryServiceServicer(object):
@@ -129,6 +134,13 @@ class RepositoryServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CloneRepo(self, request, context):
+        """Phase 5: Sync with External Source
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_RepositoryServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -171,6 +183,11 @@ def add_RepositoryServiceServicer_to_server(servicer, server):
                     servicer.MergeRepo,
                     request_deserializer=repository__pb2.MergeRepoRequest.FromString,
                     response_serializer=repository__pb2.MergeRepoResponse.SerializeToString,
+            ),
+            'CloneRepo': grpc.unary_unary_rpc_method_handler(
+                    servicer.CloneRepo,
+                    request_deserializer=repository__pb2.CloneRepoRequest.FromString,
+                    response_serializer=repository__pb2.CloneRepoResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -389,6 +406,33 @@ class RepositoryService(object):
             '/repository.RepositoryService/MergeRepo',
             repository__pb2.MergeRepoRequest.SerializeToString,
             repository__pb2.MergeRepoResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CloneRepo(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/repository.RepositoryService/CloneRepo',
+            repository__pb2.CloneRepoRequest.SerializeToString,
+            repository__pb2.CloneRepoResponse.FromString,
             options,
             channel_credentials,
             insecure,
