@@ -1,0 +1,171 @@
+import grpc
+from concurrent import futures
+import time
+import os
+import threading
+
+from generated import repository_pb2
+from generated import repository_pb2_grpc
+
+from git_plumbing import GitPlumbing
+
+class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
+    def __init__(self, base_dir="/data/repo"):
+        self.git = GitPlumbing(base_dir=base_dir)
+        self.locks = {} # Basic in-memory lock per repo
+        self.lock_mutex = threading.Lock()
+
+    def _get_lock(self, repo_key):
+        with self.lock_mutex:
+            if repo_key not in self.locks:
+                self.locks[repo_key] = threading.Lock()
+            return self.locks[repo_key]
+
+    def InitRepo(self, request, context):
+        try:
+            rel_path = f"{request.user_id}/{request.repo_name}.git"
+            full_path = self.git.init_bare_repo(rel_path)
+            return repository_pb2.InitRepoResponse(
+                success=True,
+                message="Repository initialized",
+                repo_path=full_path
+            )
+        except Exception as e:
+            return repository_pb2.InitRepoResponse(success=False, message=str(e))
+
+    def ApplyCommit(self, request, context):
+        repo_key = f"{request.user_id}/{request.repo_name}"
+        repo_path = os.path.join(self.git.base_dir, f"{repo_key}.git")
+        
+        lock = self._get_lock(repo_key)
+        with lock:
+            try:
+                # 1. Get current tree
+                parent_hash = self.git.get_ref(repo_path, request.target_ref)
+                tree_entries = {} # path -> (mode, type, hash)
+                
+                if parent_hash:
+                    ls_tree = self.git.get_tree(repo_path, parent_hash)
+                    for line in ls_tree:
+                        if not line: continue
+                        # Format: <mode> <type> <hash>\t<path>
+                        meta, path = line.split('\t')
+                        mode, type_, hash_ = meta.split(' ')
+                        tree_entries[path] = (mode, type_, hash_)
+                
+                # 2. Apply changes
+                for change in request.changes:
+                    if change.action == repository_pb2.FileChange.DELETE:
+                        if change.path in tree_entries:
+                            del tree_entries[change.path]
+                    else: # ADD or MODIFY
+                        blob_hash = self.git.hash_object(repo_path, change.content)
+                        tree_entries[change.path] = ("100644", "blob", blob_hash)
+                
+                # 3. Build tree info for mktree
+                mktree_lines = []
+                for path, (mode, type_, hash_) in sorted(tree_entries.items()):
+                    mktree_lines.append(f"{mode} {type_} {hash_}\t{path}")
+                
+                new_tree_hash = self.git.write_tree(repo_path, "\n".join(mktree_lines) + "\n")
+                
+                # 4. Create commit
+                new_commit_hash = self.git.commit_tree(
+                    repo_path, 
+                    new_tree_hash, 
+                    parent_hash=parent_hash,
+                    message=request.commit_message,
+                    author_name=request.author_name,
+                    author_email=request.author_email
+                )
+                
+                # 5. Update ref
+                self.git.update_ref(repo_path, request.target_ref, new_commit_hash, old_hash=parent_hash)
+                
+                return repository_pb2.ApplyCommitResponse(
+                    success=True,
+                    commit_hash=new_commit_hash,
+                    message="Commit applied successfully via plumbing"
+                )
+            except Exception as e:
+                return repository_pb2.ApplyCommitResponse(success=False, message=str(e))
+
+    def MergeRepo(self, request, context):
+        # Implementation of merging src into dest
+        src_repo_path = os.path.join(self.git.base_dir, f"{request.src_user_id}/{request.src_repo_name}.git")
+        dest_repo_path = os.path.join(self.git.base_dir, f"{request.dest_user_id}/{request.dest_repo_name}.git")
+        
+        # In a distributed system, we might need to fetch objects if nodes are different.
+        # But for this Phase, assume they are on the same filesystem or node.
+        try:
+            # We treat dest as the target Master repo
+            src_hash = self.git.get_ref(src_repo_path, request.src_ref)
+            if not src_hash:
+                raise Exception(f"Source ref {request.src_ref} not found")
+                
+            # For this simplified implementation, we'll fast-forward the dest ref
+            # to the src_hash if it's the Master repo.
+            # (In reality, you'd do a 'git fetch' from src to dest first)
+            
+            # Since objects are shared (hardlinks/same node), we can update ref directly.
+            self.git.update_ref(dest_repo_path, request.dest_ref, src_hash)
+            
+            return repository_pb2.MergeRepoResponse(
+                success=True,
+                new_commit_hash=src_hash,
+                message="Merged successfully (Fast-forwarded)"
+            )
+        except Exception as e:
+            return repository_pb2.MergeRepoResponse(success=False, message=str(e))
+
+    def ForkRepo(self, request, context):
+        try:
+            src_rel = f"{request.src_user_id}/{request.src_repo_name}.git"
+            dest_rel = f"{request.dest_user_id}/{request.dest_repo_name}.git"
+            self.git.fork_repo(src_rel, dest_rel)
+            return repository_pb2.ForkRepoResponse(success=True, message="Forked successfully")
+        except Exception as e:
+            return repository_pb2.ForkRepoResponse(success=False, message=str(e))
+
+    def ListFiles(self, request, context):
+        try:
+            repo_path = os.path.join(self.git.base_dir, f"{request.user_id}/{request.repo_name}.git")
+            entries = self.git.list_files(repo_path, request.ref, request.path)
+            
+            proto_entries = [
+                repository_pb2.FileEntry(
+                    name=e['name'],
+                    is_dir=e['is_dir'],
+                    size=e['size'],
+                    commit_hash=e['hash']
+                ) for e in entries
+            ]
+            return repository_pb2.ListFilesResponse(entries=proto_entries)
+        except Exception as e:
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return repository_pb2.ListFilesResponse()
+
+    def CheckoutView(self, request, context):
+        try:
+            repo_path = os.path.join(self.git.base_dir, f"{request.user_id}/{request.repo_name}.git")
+            content = self.git.cat_file(repo_path, request.ref, request.path)
+            
+            # Streaming back in 1MB chunks
+            chunk_size = 1024 * 1024
+            for i in range(0, len(content), chunk_size):
+                yield repository_pb2.FileContent(chunk=content[i:i+chunk_size])
+        except Exception as e:
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+
+def serve():
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    repository_pb2_grpc.add_RepositoryServiceServicer_to_server(RepositoryService(), server)
+    server.add_insecure_port('[::]:50051')
+    print("Storage Node Agent starting on port 50051...")
+    server.start()
+    server.wait_for_termination()
+
+if __name__ == '__main__':
+    serve()

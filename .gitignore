@@ -143,6 +143,13 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+docuhub_venv/
+local_lib_old/
+venv_old/
+
+# uv
+.uv_cache/
+uv.lock
 
 # Spyder project settings
 .spyderproject

@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package repository;
+
+service RepositoryService {
+  // Phase 2: Core Functions
+  rpc InitRepo (InitRepoRequest) returns (InitRepoResponse);
+  rpc ApplyCommit (ApplyCommitRequest) returns (ApplyCommitResponse);
+  rpc ForkRepo (ForkRepoRequest) returns (ForkRepoResponse);
+  rpc GetRef (GetRefRequest) returns (GetRefResponse);
+  rpc CheckoutView (CheckoutViewRequest) returns (stream FileContent);
+  rpc ListFiles (ListFilesRequest) returns (ListFilesResponse);
+  rpc CreateTag (CreateTagRequest) returns (CreateTagResponse);
+  
+  // Phase 4: Integration
+  rpc MergeRepo (MergeRepoRequest) returns (MergeRepoResponse);
+}
+
+message ListFilesRequest {
+  string user_id = 1;
+  string repo_name = 2;
+  string ref = 3;  // e.g. "main"
+  string path = 4; // e.g. "", "docs/"
+}
+
+message FileEntry {
+  string name = 1;
+  bool is_dir = 2;
+  int64 size = 3;
+  string commit_hash = 4;
+}
+
+message ListFilesResponse {
+  repeated FileEntry entries = 1;
+}
+
+message MergeRepoRequest {
+  string src_user_id = 1;
+  string src_repo_name = 2;
+  string src_ref = 3;  // e.g., "refs/heads/main" or a specific commit
+  string dest_user_id = 4;
+  string dest_repo_name = 5;
+  string dest_ref = 6; // Usually "refs/heads/main"
+}
+
+message MergeRepoResponse {
+  bool success = 1;
+  string new_commit_hash = 2;
+  string message = 3;
+}
+
+message InitRepoRequest {
+  string user_id = 1;
+  string repo_name = 2; // Unique within the user's namespace
+}
+
+message InitRepoResponse {
+  bool success = 1;
+  string message = 2;
+  string repo_path = 3;
+}
+
+message FileChange {
+  enum Action {
+    ADD = 0;
+    MODIFY = 1;
+    DELETE = 2;
+  }
+  string path = 1;
+  bytes content = 2;
+  Action action = 3;
+}
+
+message ApplyCommitRequest {
+  string user_id = 1;
+  string repo_name = 2;
+  string target_ref = 3; // e.g. "refs/heads/main"
+  string commit_message = 4;
+  string author_name = 5;
+  string author_email = 6;
+  repeated FileChange changes = 7;
+}
+
+message ApplyCommitResponse {
+  bool success = 1;
+  string commit_hash = 2;
+  string message = 3;
+}
+
+message ForkRepoRequest {
+  string src_user_id = 1;
+  string src_repo_name = 2;
+  string dest_user_id = 3;
+  string dest_repo_name = 4;
+}
+
+message ForkRepoResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetRefRequest {
+  string user_id = 1;
+  string repo_name = 2;
+  string ref = 3; // e.g. "refs/heads/main" or "v1.0"
+}
+
+message GetRefResponse {
+  string commit_hash = 1;
+}
+
+message CheckoutViewRequest {
+  string user_id = 1;
+  string repo_name = 2;
+  string ref = 3;
+  string file_path = 4;
+}
+
+message FileContent {
+  bytes chunk = 1;
+}
+
+message CreateTagRequest {
+  string user_id = 1;
+  string repo_name = 2;
+  string tag_name = 3;
+  string target_ref = 4;
+}
+
+message CreateTagResponse {
+  bool success = 1;
+  string message = 2;
+}
