@@ -1,0 +1,31 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  storagenode:
+    build: .
+    volumes:
+      - repo-data:/data/repo
+    environment:
+      - STORAGE_BASE_DIR=/data/repo
+      - STORAGE_PORT=50051
+    command: python -m docuhub.storagenode.service
+    ports:
+      - "50051:50051"
+
+  api-server:
+    build: .
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    command: uvicorn docuhub.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - storagenode
+
+volumes:
+  repo-data:
