@@ -14,10 +14,25 @@ service RepositoryService {
   
   // Phase 4: Integration
   rpc MergeRepo (MergeRepoRequest) returns (MergeRepoResponse);
+  
+  // Phase 5: Sync with External Source
+  rpc CloneRepo (CloneRepoRequest) returns (CloneRepoResponse);
+}
+
+message CloneRepoRequest {
+  string remote_url = 1;
+  string namespace = 2;   // Usually "upstream" or "global" for Upstream repo
+  string repo_name = 3;
+}
+
+message CloneRepoResponse {
+  bool success = 1;
+  string message = 2;
+  string repo_path = 3;
 }
 
 message ListFilesRequest {
-  string user_id = 1;
+  string namespace = 1;
   string repo_name = 2;
   string ref = 3;  // e.g. "main"
   string path = 4; // e.g. "", "docs/"
@@ -35,10 +50,10 @@ message ListFilesResponse {
 }
 
 message MergeRepoRequest {
-  string src_user_id = 1;
+  string src_namespace = 1;
   string src_repo_name = 2;
   string src_ref = 3;  // e.g., "refs/heads/main" or a specific commit
-  string dest_user_id = 4;
+  string dest_namespace = 4;
   string dest_repo_name = 5;
   string dest_ref = 6; // Usually "refs/heads/main"
 }
@@ -50,8 +65,8 @@ message MergeRepoResponse {
 }
 
 message InitRepoRequest {
-  string user_id = 1;
-  string repo_name = 2; // Unique within the user's namespace
+  string namespace = 1;
+  string repo_name = 2; // Unique within the namespace
 }
 
 message InitRepoResponse {
@@ -72,7 +87,7 @@ message FileChange {
 }
 
 message ApplyCommitRequest {
-  string user_id = 1;
+  string namespace = 1;
   string repo_name = 2;
   string target_ref = 3; // e.g. "refs/heads/main"
   string commit_message = 4;
@@ -88,9 +103,9 @@ message ApplyCommitResponse {
 }
 
 message ForkRepoRequest {
-  string src_user_id = 1;
+  string src_namespace = 1;
   string src_repo_name = 2;
-  string dest_user_id = 3;
+  string dest_namespace = 3;
   string dest_repo_name = 4;
 }
 
@@ -100,7 +115,7 @@ message ForkRepoResponse {
 }
 
 message GetRefRequest {
-  string user_id = 1;
+  string namespace = 1;
   string repo_name = 2;
   string ref = 3; // e.g. "refs/heads/main" or "v1.0"
 }
@@ -110,7 +125,7 @@ message GetRefResponse {
 }
 
 message CheckoutViewRequest {
-  string user_id = 1;
+  string namespace = 1;
   string repo_name = 2;
   string ref = 3;
   string file_path = 4;
@@ -121,7 +136,7 @@ message FileContent {
 }
 
 message CreateTagRequest {
-  string user_id = 1;
+  string namespace = 1;
   string repo_name = 2;
   string tag_name = 3;
   string target_ref = 4;
