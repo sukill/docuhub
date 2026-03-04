@@ -39,7 +39,7 @@
     - `CheckoutView`: 특정 해시/태그의 파일 내용 읽기.
         
 
-### **Phase 3: Storage Node 에이전트 개발**
+### **Phase 3: Storage Node 개발**
 
 - **Git Plumbing 활용:** `git add/commit` 등 하이레벨 명령보다 `hash-object`, `update-ref` 등 로우레벨 명령을 사용하여 속도와 안정성 확보.
     

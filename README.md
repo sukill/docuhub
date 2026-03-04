@@ -31,24 +31,46 @@ uv sync
 ### 2. Protobuf 컴파일
 
 ```bash
-uv run python -m grpc_tools.protoc -I./proto --python_out=./generated --grpc_python_out=./generated ./proto/repository.proto
+make proto
 ```
 
 ### 3. 프로그램 실행
 
-`uv run`을 사용하면 별도의 가상환경 활성화 없이 즉시 실행이 가능합니다.
+프로젝트의 진입점을 더 직관적으로 사용할 수 있도록 루트 디렉토리에 `main.py`를 제공합니다.
 
-#### 가이드라인 스토리지 노드 실행 (gRPC)
+#### 통합 실행 (`main.py` 사용)
 ```bash
-uv run python storage/agent.py
+# API 서버 실행
+python main.py api --reload
+
+# 스토리지 노드 실행
+python main.py storagenode
 ```
 
-#### API 서버 실행 (FastAPI)
+#### CLI 명령어로 실행 (패키지 설치 후)
 ```bash
-# 새로운 터미널 세션 권장
-uv run uvicorn api.main:app --reload
+docuhub-api
+docuhub-storagenode
 ```
 
+#### 기존 방식 (`uv run` 사용)
+```bash
+# 스토리지 노드
+uv run python -m docuhub.storagenode.service
+
+# API 서버
+uv run uvicorn docuhub.api.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+### 3. Docker Compose로 실행 (추천)
+
+Docker가 설치되어 있다면 Redis와 모든 서버를 한 번에 실행할 수 있습니다.
+
+```bash
+docker-compose up --build
+```
+
+---
 ## 주요 기술 스택
 - **Language:** Python 3.9+
 - **Infrastructure:** uv (Dependency Management)
