@@ -26,15 +26,34 @@ class GitPlumbing:
             subprocess.run(["git", "init", "--bare", full_path], check=True)
         return full_path
 
-    def clone_repo(self, remote_url, rel_path):
+    def clone_repo(self, remote_url, rel_path, auth_helper=None):
         full_path = os.path.join(self.base_dir, rel_path)
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
 
         if os.path.exists(full_path):
-            # Already exists, we might want to fetch instead, but for initialization:
+            # Already exists
             return full_path
 
-        subprocess.run(["git", "clone", "--bare", remote_url, full_path], check=True)
+        env = os.environ.copy()
+        url = remote_url
+        if auth_helper:
+            url = auth_helper.get_authenticated_url(remote_url)
+            env.update(auth_helper.get_env())
+
+        try:
+            subprocess.run(
+                ["git", "clone", "--bare", url, full_path],
+                check=True,
+                env=env,
+                capture_output=True,
+                text=True
+            )
+        except subprocess.CalledProcessError as e:
+            raise Exception(f"Git clone failed: {e.stderr}")
+        finally:
+            if auth_helper:
+                auth_helper.cleanup()
+                
         return full_path
 
     def fork_repo(self, src_rel_path, dest_rel_path):

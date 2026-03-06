@@ -7,6 +7,7 @@ import redis
 from docuhub.generated import repository_pb2
 from docuhub.generated import repository_pb2_grpc
 from .git_plumbing import GitPlumbing
+from .auth import AuthHelper
 
 
 class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
@@ -140,7 +141,11 @@ class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
     def CloneRepo(self, request, context):
         try:
             rel_path = f"{request.user_id}/{request.repo_name}.git"
-            full_path = self.git.clone_repo(request.remote_url, rel_path)
+            auth_helper = None
+            if request.HasField("auth"):
+                auth_helper = AuthHelper(request.auth)
+                
+            full_path = self.git.clone_repo(request.remote_url, rel_path, auth_helper=auth_helper)
             return repository_pb2.CloneRepoResponse(
                 success=True,
                 message="Repository cloned from external source",

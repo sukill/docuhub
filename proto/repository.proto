@@ -19,10 +19,23 @@ service RepositoryService {
   rpc CloneRepo (CloneRepoRequest) returns (CloneRepoResponse);
 }
 
+message AuthCredentials {
+  enum AuthType {
+    NONE = 0;
+    TOKEN = 1;
+    SSH = 2;
+  }
+  AuthType auth_type = 1;
+  string token = 2;       // For AuthType.TOKEN (e.g., GitHub Personal Access Token)
+  string ssh_key = 3;     // For AuthType.SSH (Private key content)
+  string username = 4;    // Optional, defaults to "git" for SSH if not provided
+}
+
 message CloneRepoRequest {
   string remote_url = 1;
-  string namespace = 2;   // Usually "upstream" or "global" for Upstream repo
+  string user_id = 2;     // Should match the namespace/user_id logic
   string repo_name = 3;
+  AuthCredentials auth = 4;
 }
 
 message CloneRepoResponse {
