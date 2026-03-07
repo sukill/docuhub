@@ -39,40 +39,38 @@ class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
 
         lock = self._get_lock(repo_key)
         with lock:
+            # Use absolute path for temp index to avoid issues with different CWDs
+            temp_index = os.path.abspath(os.path.join(self.git.base_dir, f"index_{request.namespace}_{request.repo_name}"))
             try:
-                # 1. Get current tree
+                # 1. Clean up or prepare temp index
+                if os.path.exists(temp_index):
+                    os.remove(temp_index)
+                
+                # Ensure the base directory exists
+                os.makedirs(os.path.dirname(temp_index), exist_ok=True)
+
                 parent_hash = self.git.get_ref(repo_path, request.target_ref)
-                tree_entries = {}  # path -> (mode, type, hash)
-
+                
+                # 2. Read current tree into index if parent exists
                 if parent_hash:
-                    ls_tree = self.git.get_tree(repo_path, parent_hash)
-                    for line in ls_tree:
-                        if not line:
-                            continue
-                        # Format: <mode> <type> <hash>\t<path>
-                        meta, path = line.split("\t")
-                        mode, type_, hash_ = meta.split(" ")
-                        tree_entries[path] = (mode, type_, hash_)
+                    self.git.read_tree_to_index(repo_path, parent_hash, temp_index)
 
-                # 2. Apply changes
+                # 3. Hash objects and prepare changes
+                index_changes = []
                 for change in request.changes:
                     if change.action == repository_pb2.FileChange.DELETE:
-                        if change.path in tree_entries:
-                            del tree_entries[change.path]
-                    else:  # ADD or MODIFY
+                        index_changes.append({"path": change.path, "action": "DELETE"})
+                    else:
                         blob_hash = self.git.hash_object(repo_path, change.content)
-                        tree_entries[change.path] = ("100644", "blob", blob_hash)
+                        index_changes.append({"path": change.path, "action": "ADD", "blob_hash": blob_hash})
 
-                # 3. Build tree info for mktree
-                mktree_lines = []
-                for path, (mode, type_, hash_) in sorted(tree_entries.items()):
-                    mktree_lines.append(f"{mode} {type_} {hash_}\t{path}")
+                # 4. Update index
+                self.git.update_index(repo_path, temp_index, index_changes)
 
-                new_tree_hash = self.git.write_tree(
-                    repo_path, "\n".join(mktree_lines) + "\n"
-                )
+                # 5. Write tree from index
+                new_tree_hash = self.git.write_tree_from_index(repo_path, temp_index)
 
-                # 4. Create commit
+                # 6. Create commit
                 new_commit_hash = self.git.commit_tree(
                     repo_path,
                     new_tree_hash,
@@ -82,7 +80,7 @@ class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
                     author_email=request.author_email,
                 )
 
-                # 5. Update ref
+                # 7. Update ref
                 self.git.update_ref(
                     repo_path, request.target_ref, new_commit_hash, old_hash=parent_hash
                 )
@@ -94,6 +92,9 @@ class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
                 )
             except Exception as e:
                 return repository_pb2.ApplyCommitResponse(success=False, message=str(e))
+            finally:
+                if os.path.exists(temp_index):
+                    os.remove(temp_index)
 
     def MergeRepo(self, request, context):
         # Implementation of merging src into dest

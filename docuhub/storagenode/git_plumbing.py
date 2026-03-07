@@ -25,13 +25,14 @@ class GitPlumbing:
     def __init__(self, base_dir="/data/repo"):
         self.base_dir = base_dir
 
-    def _run_git(self, repo_path, args, input=None):
+    def _run_git(self, repo_path, args, input=None, env=None):
         cmd = ["git", "-C", repo_path] + args
         result = subprocess.run(
             cmd,
             input=input,
             capture_output=True,
             text=False,  # Keep bytes for content handling
+            env=env
         )
         if result.returncode != 0:
             error_msg = result.stderr.decode("utf-8", errors="replace")
@@ -110,10 +111,35 @@ class GitPlumbing:
             args.append(old_hash)
         self._run_git(repo_path, args)
 
-    def write_tree(self, repo_path, index_info):
-        # index_info format: "100644 blob <hash>\t<path>"
-        output = self._run_git(repo_path, ["mktree"], input=index_info.encode("utf-8"))
+    def write_tree_from_index(self, repo_path, index_file):
+        """Write a tree object from a specific index file."""
+        env = os.environ.copy()
+        env["GIT_INDEX_FILE"] = index_file
+        output = self._run_git(repo_path, ["write-tree"], env=env if env else None)
         return output.decode("utf-8").strip()
+
+    def read_tree_to_index(self, repo_path, tree_ish, index_file):
+        """Read a tree-ish into a specific index file."""
+        env = os.environ.copy()
+        env["GIT_INDEX_FILE"] = index_file
+        self._run_git(repo_path, ["read-tree", tree_ish], env=env)
+
+    def update_index(self, repo_path, index_file, changes):
+        """Update index with blob changes."""
+        # changes: list of {path, action, blob_hash}
+        env = os.environ.copy()
+        env["GIT_INDEX_FILE"] = index_file
+        
+        for change in changes:
+            if change["action"] == "DELETE":
+                self._run_git(repo_path, ["update-index", "--remove", change["path"]], env=env)
+            else:
+                # ADD or MODIFY
+                self._run_git(
+                    repo_path, 
+                    ["update-index", "--add", "--cacheinfo", f"100644,{change['blob_hash']},{change['path']}"],
+                    env=env
+                )
 
     def commit_tree(
         self,
