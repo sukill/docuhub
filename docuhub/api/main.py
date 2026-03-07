@@ -213,6 +213,28 @@ async def list_files(user_id: str, repo_name: str, ref: str = "main", path: str 
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/repo/file")
+async def read_file(user_id: str, repo_name: str, ref: str = "main", path: str = ""):
+    """Read the content of a specific file."""
+    try:
+        stub = router.get_client_stub(user_id)
+        request = repository_pb2.CheckoutViewRequest(
+            namespace=user_id, repo_name=repo_name, ref=ref, file_path=path
+        )
+        
+        content = b""
+        # CheckoutView returns a stream of FileContent
+        for response in stub.CheckoutView(request):
+            content += response.chunk
+            
+        return {
+            "success": True,
+            "content": content.decode("utf-8", errors="replace")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 def run():
     import uvicorn
 
