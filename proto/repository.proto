@@ -33,7 +33,7 @@ message AuthCredentials {
 
 message CloneRepoRequest {
   string remote_url = 1;
-  string user_id = 2;     // Should match the namespace/user_id logic
+  string namespace = 2;     // Should match the namespace logic
   string repo_name = 3;
   AuthCredentials auth = 4;
 }

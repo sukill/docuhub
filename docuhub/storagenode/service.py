@@ -6,7 +6,7 @@ from concurrent import futures
 import redis
 from docuhub.generated import repository_pb2
 from docuhub.generated import repository_pb2_grpc
-from .git_plumbing import GitPlumbing
+from .git_plumbing import GitPlumbing, RefNotFoundError, PathNotFoundError, RepoNotFoundError
 from .auth import AuthHelper
 
 
@@ -25,7 +25,7 @@ class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
 
     def InitRepo(self, request, context):
         try:
-            rel_path = f"{request.user_id}/{request.repo_name}.git"
+            rel_path = f"{request.namespace}/{request.repo_name}.git"
             full_path = self.git.init_bare_repo(rel_path)
             return repository_pb2.InitRepoResponse(
                 success=True, message="Repository initialized", repo_path=full_path
@@ -34,7 +34,7 @@ class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
             return repository_pb2.InitRepoResponse(success=False, message=str(e))
 
     def ApplyCommit(self, request, context):
-        repo_key = f"{request.user_id}/{request.repo_name}"
+        repo_key = f"{request.namespace}/{request.repo_name}"
         repo_path = os.path.join(self.git.base_dir, f"{repo_key}.git")
 
         lock = self._get_lock(repo_key)
@@ -98,10 +98,10 @@ class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
     def MergeRepo(self, request, context):
         # Implementation of merging src into dest
         src_repo_path = os.path.join(
-            self.git.base_dir, f"{request.src_user_id}/{request.src_repo_name}.git"
+            self.git.base_dir, f"{request.src_namespace}/{request.src_repo_name}.git"
         )
         dest_repo_path = os.path.join(
-            self.git.base_dir, f"{request.dest_user_id}/{request.dest_repo_name}.git"
+            self.git.base_dir, f"{request.dest_namespace}/{request.dest_repo_name}.git"
         )
 
         # In a distributed system, we might need to fetch objects if nodes are different.
@@ -129,8 +129,8 @@ class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
 
     def ForkRepo(self, request, context):
         try:
-            src_rel = f"{request.src_user_id}/{request.src_repo_name}.git"
-            dest_rel = f"{request.dest_user_id}/{request.dest_repo_name}.git"
+            src_rel = f"{request.src_namespace}/{request.src_repo_name}.git"
+            dest_rel = f"{request.dest_namespace}/{request.dest_repo_name}.git"
             self.git.fork_repo(src_rel, dest_rel)
             return repository_pb2.ForkRepoResponse(
                 success=True, message="Forked successfully"
@@ -140,7 +140,7 @@ class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
 
     def CloneRepo(self, request, context):
         try:
-            rel_path = f"{request.user_id}/{request.repo_name}.git"
+            rel_path = f"{request.namespace}/{request.repo_name}.git"
             auth_helper = None
             if request.HasField("auth"):
                 auth_helper = AuthHelper(request.auth)
@@ -157,7 +157,7 @@ class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
     def ListFiles(self, request, context):
         try:
             repo_path = os.path.join(
-                self.git.base_dir, f"{request.user_id}/{request.repo_name}.git"
+                self.git.base_dir, f"{request.namespace}/{request.repo_name}.git"
             )
             entries = self.git.list_files(repo_path, request.ref, request.path)
 
@@ -171,6 +171,10 @@ class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
                 for e in entries
             ]
             return repository_pb2.ListFilesResponse(entries=proto_entries)
+        except (RefNotFoundError, PathNotFoundError, RepoNotFoundError) as e:
+            context.set_code(grpc.StatusCode.NOT_FOUND)
+            context.set_details(str(e))
+            return repository_pb2.ListFilesResponse()
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
@@ -179,14 +183,17 @@ class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
     def CheckoutView(self, request, context):
         try:
             repo_path = os.path.join(
-                self.git.base_dir, f"{request.user_id}/{request.repo_name}.git"
+                self.git.base_dir, f"{request.namespace}/{request.repo_name}.git"
             )
-            content = self.git.cat_file(repo_path, request.ref, request.path)
+            content = self.git.cat_file(repo_path, request.ref, request.file_path)
 
             # Streaming back in 1MB chunks
             chunk_size = 1024 * 1024
             for i in range(0, len(content), chunk_size):
                 yield repository_pb2.FileContent(chunk=content[i : i + chunk_size])
+        except (RefNotFoundError, PathNotFoundError, RepoNotFoundError) as e:
+            context.set_code(grpc.StatusCode.NOT_FOUND)
+            context.set_details(str(e))
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))

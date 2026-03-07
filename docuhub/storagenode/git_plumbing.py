@@ -2,6 +2,25 @@ import subprocess
 import os
 
 
+class RefNotFoundError(Exception):
+    def __init__(self, ref):
+        self.ref = ref
+        super().__init__(f"Ref {ref} not found")
+
+
+class PathNotFoundError(Exception):
+    def __init__(self, ref, path):
+        self.ref = ref
+        self.path = path
+        super().__init__(f"Path {path} not found in ref {ref}")
+
+
+class RepoNotFoundError(Exception):
+    def __init__(self, repo_path):
+        self.repo_path = repo_path
+        super().__init__(f"Repository at {repo_path} not found")
+
+
 class GitPlumbing:
     def __init__(self, base_dir="/data/repo"):
         self.base_dir = base_dir
@@ -154,11 +173,27 @@ class GitPlumbing:
         return src_hash
 
     def list_files(self, repo_path, ref, path):
-        # git ls-tree -l <ref>:<path>
-        args = ["ls-tree", "-l", f"{ref}:{path}" if path else ref]
-        output = self._run_git(repo_path, args)
-        lines = output.decode("utf-8").strip().split("\n")
+        # 1. Check if repository directory exists
+        if not os.path.exists(repo_path):
+            raise RepoNotFoundError(repo_path)
 
+        # 2. Check if ref exists
+        if not self.get_ref(repo_path, ref):
+            # For a brand new repo, the default ref (e.g. main) doesn't exist yet.
+            # Returning an empty list is more natural than 404 for existing repos.
+            return []
+
+        # 3. git ls-tree -l <ref>:<path>
+        args = ["ls-tree", "-l", f"{ref}:{path}" if path else ref]
+        try:
+            output = self._run_git(repo_path, args)
+        except Exception as e:
+            # If ls-tree fails but ref exists, it's likely a path error
+            if "fatal: Not a valid object name" in str(e) or "fatal: not a tree object" in str(e):
+                raise PathNotFoundError(ref, path)
+            raise e
+
+        lines = output.decode("utf-8").strip().split("\n")
         entries = []
         for line in lines:
             if not line:
@@ -184,6 +219,19 @@ class GitPlumbing:
         return entries
 
     def cat_file(self, repo_path, ref, path):
-        # git cat-file -p <ref>:<path>
+        # 1. Check if repository directory exists
+        if not os.path.exists(repo_path):
+            raise RepoNotFoundError(repo_path)
+
+        # 2. Check if ref exists
+        if not self.get_ref(repo_path, ref):
+            raise RefNotFoundError(ref)
+
+        # 3. git cat-file -p <ref>:<path>
         args = ["cat-file", "-p", f"{ref}:{path}"]
-        return self._run_git(repo_path, args)
+        try:
+            return self._run_git(repo_path, args)
+        except Exception as e:
+            if "fatal: Not a valid object name" in str(e):
+                raise PathNotFoundError(ref, path)
+            raise e
