@@ -7,11 +7,13 @@ services:
   storagenode:
     build: .
     volumes:
-      - repo-data:/data/repo
+      - ./data/repo:/data/repo
     environment:
       - STORAGE_BASE_DIR=/data/repo
       - STORAGE_PORT=50051
-    command: python -m docuhub.storagenode.service
+      - NODE_ADDRESS=storagenode:50051
+      - REDIS_HOST=redis
+    command: python -u -m docuhub.storagenode.service
     ports:
       - "50051:50051"
 
@@ -20,12 +22,10 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-    command: uvicorn docuhub.api.main:app --host 0.0.0.0 --port 8000
+    command: uvicorn docuhub.api.main:app --host 0.0.0.0 --port 8001
     ports:
-      - "8000:8000"
+      - "8001:8001"
     depends_on:
       - redis
       - storagenode
 
-volumes:
-  repo-data:

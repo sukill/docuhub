@@ -19,9 +19,10 @@ RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy the virtual environment and the source code
+# Copy the virtual environment and then the source code
 COPY --from=builder /app/.venv /app/.venv
-COPY . /app
+COPY docuhub /app/docuhub
+COPY main.py pyproject.toml uv.lock /app/
 
 # Set up the environment
 ENV PATH="/app/.venv/bin:$PATH"
