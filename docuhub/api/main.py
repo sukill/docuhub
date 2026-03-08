@@ -262,6 +262,23 @@ async def list_repos(namespace: str):
     return {"repo_names": list(response.repo_names)}
 
 
+@app.get("/repo/refs")
+async def list_refs(namespace: str, repo_name: str):
+    """List all branches and tags for a repository."""
+    from docuhub.storagenode.git_plumbing import GitPlumbing, RepoNotFoundError
+    import os
+    base_dir = os.getenv("STORAGE_BASE_DIR", "data/repo")
+    git = GitPlumbing(base_dir=base_dir)
+    repo_path = os.path.join(base_dir, f"{namespace}/{repo_name}.git")
+    try:
+        refs = git.list_refs(repo_path)
+        return {"refs": refs}
+    except RepoNotFoundError:
+        raise HTTPException(status_code=404, detail="Repository not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 def run():
     import uvicorn
 

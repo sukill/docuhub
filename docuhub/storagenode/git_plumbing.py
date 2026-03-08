@@ -140,6 +140,8 @@ class GitPlumbing:
         # changes: list of {path, action, blob_hash}
         env = os.environ.copy()
         env["GIT_INDEX_FILE"] = index_file
+        # git update-index --remove fails in bare repos unless GIT_WORK_TREE is set
+        env["GIT_WORK_TREE"] = "/tmp"
         
         for change in changes:
             if change["action"] == "DELETE":
@@ -221,7 +223,8 @@ class GitPlumbing:
             return []
 
         # 3. git ls-tree -l <ref>:<path>
-        args = ["ls-tree", "-l", f"{ref}:{path}" if path else ref]
+        # core.quotepath=false prevents git from escaping non-ASCII (e.g. Korean) filenames
+        args = ["-c", "core.quotepath=false", "ls-tree", "-l", f"{ref}:{path}" if path else ref]
         try:
             output = self._run_git(repo_path, args)
         except Exception as e:
@@ -272,3 +275,24 @@ class GitPlumbing:
             if "fatal: Not a valid object name" in str(e):
                 raise PathNotFoundError(ref, path)
             raise e
+
+    def list_refs(self, repo_path):
+        """List all branches and tags in the repository."""
+        if not os.path.exists(repo_path):
+            raise RepoNotFoundError(repo_path)
+        try:
+            output = self._run_git(repo_path, [
+                "for-each-ref",
+                "--format=%(refname:short)\t%(objecttype)",
+                "refs/heads/",
+                "refs/tags/",
+            ])
+            refs = []
+            for line in output.decode("utf-8").strip().splitlines():
+                if not line:
+                    continue
+                name, ref_type = line.split("\t", 1)
+                refs.append({"name": name, "type": ref_type})
+            return refs
+        except Exception:
+            return []
