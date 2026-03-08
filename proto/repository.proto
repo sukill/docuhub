@@ -10,6 +10,7 @@ service RepositoryService {
   rpc GetRef (GetRefRequest) returns (GetRefResponse);
   rpc CheckoutView (CheckoutViewRequest) returns (stream FileContent);
   rpc ListFiles (ListFilesRequest) returns (ListFilesResponse);
+  rpc ListRepos (ListReposRequest) returns (ListReposResponse);
   rpc CreateTag (CreateTagRequest) returns (CreateTagResponse);
   
   // Phase 4: Integration
@@ -60,6 +61,14 @@ message FileEntry {
 
 message ListFilesResponse {
   repeated FileEntry entries = 1;
+}
+
+message ListReposRequest {
+  string namespace = 1;
+}
+
+message ListReposResponse {
+  repeated string repo_names = 1;
 }
 
 message MergeRepoRequest {

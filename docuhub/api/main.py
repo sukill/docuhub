@@ -253,6 +253,15 @@ async def read_file(namespace: str, repo_name: str, ref: str = "main", path: str
     }
 
 
+@app.get("/repo/list")
+async def list_repos(namespace: str):
+    """List all repositories for a specific namespace."""
+    stub = router.get_client_stub(namespace)
+    request = repository_pb2.ListReposRequest(namespace=namespace)
+    response = stub.ListRepos(request)
+    return {"repo_names": list(response.repo_names)}
+
+
 def run():
     import uvicorn
 

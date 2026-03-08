@@ -39,6 +39,17 @@ class GitPlumbing:
             raise Exception(f"Git command failed: {' '.join(cmd)}\nError: {error_msg}")
         return result.stdout
 
+    def list_repositories(self, namespace):
+        namespace_path = os.path.join(self.base_dir, namespace)
+        if not os.path.exists(namespace_path):
+            return []
+        
+        repos = []
+        for d in os.listdir(namespace_path):
+            if d.endswith(".git") and os.path.isdir(os.path.join(namespace_path, d)):
+                repos.append(d[:-4]) # Remove .git suffix
+        return sorted(repos)
+
     def init_bare_repo(self, rel_path):
         full_path = os.path.join(self.base_dir, rel_path)
         os.makedirs(os.path.dirname(full_path), exist_ok=True)

@@ -64,6 +64,11 @@ class RepositoryServiceStub(object):
                 request_serializer=repository__pb2.ListFilesRequest.SerializeToString,
                 response_deserializer=repository__pb2.ListFilesResponse.FromString,
                 _registered_method=True)
+        self.ListRepos = channel.unary_unary(
+                '/repository.RepositoryService/ListRepos',
+                request_serializer=repository__pb2.ListReposRequest.SerializeToString,
+                response_deserializer=repository__pb2.ListReposResponse.FromString,
+                _registered_method=True)
         self.CreateTag = channel.unary_unary(
                 '/repository.RepositoryService/CreateTag',
                 request_serializer=repository__pb2.CreateTagRequest.SerializeToString,
@@ -121,6 +126,12 @@ class RepositoryServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListRepos(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def CreateTag(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -173,6 +184,11 @@ def add_RepositoryServiceServicer_to_server(servicer, server):
                     servicer.ListFiles,
                     request_deserializer=repository__pb2.ListFilesRequest.FromString,
                     response_serializer=repository__pb2.ListFilesResponse.SerializeToString,
+            ),
+            'ListRepos': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListRepos,
+                    request_deserializer=repository__pb2.ListReposRequest.FromString,
+                    response_serializer=repository__pb2.ListReposResponse.SerializeToString,
             ),
             'CreateTag': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateTag,
@@ -352,6 +368,33 @@ class RepositoryService(object):
             '/repository.RepositoryService/ListFiles',
             repository__pb2.ListFilesRequest.SerializeToString,
             repository__pb2.ListFilesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListRepos(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/repository.RepositoryService/ListRepos',
+            repository__pb2.ListReposRequest.SerializeToString,
+            repository__pb2.ListReposResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -181,6 +181,15 @@ class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
             context.set_details(str(e))
             return repository_pb2.ListFilesResponse()
 
+    def ListRepos(self, request, context):
+        try:
+            repo_names = self.git.list_repositories(request.namespace)
+            return repository_pb2.ListReposResponse(repo_names=repo_names)
+        except Exception as e:
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return repository_pb2.ListReposResponse()
+
     def CheckoutView(self, request, context):
         try:
             repo_path = os.path.join(
