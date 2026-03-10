@@ -74,6 +74,11 @@ class RepositoryServiceStub(object):
                 request_serializer=repository__pb2.CreateTagRequest.SerializeToString,
                 response_deserializer=repository__pb2.CreateTagResponse.FromString,
                 _registered_method=True)
+        self.DeleteRepo = channel.unary_unary(
+                '/repository.RepositoryService/DeleteRepo',
+                request_serializer=repository__pb2.DeleteRepoRequest.SerializeToString,
+                response_deserializer=repository__pb2.DeleteRepoResponse.FromString,
+                _registered_method=True)
         self.MergeRepo = channel.unary_unary(
                 '/repository.RepositoryService/MergeRepo',
                 request_serializer=repository__pb2.MergeRepoRequest.SerializeToString,
@@ -138,6 +143,12 @@ class RepositoryServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def DeleteRepo(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def MergeRepo(self, request, context):
         """Phase 4: Integration
         """
@@ -194,6 +205,11 @@ def add_RepositoryServiceServicer_to_server(servicer, server):
                     servicer.CreateTag,
                     request_deserializer=repository__pb2.CreateTagRequest.FromString,
                     response_serializer=repository__pb2.CreateTagResponse.SerializeToString,
+            ),
+            'DeleteRepo': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteRepo,
+                    request_deserializer=repository__pb2.DeleteRepoRequest.FromString,
+                    response_serializer=repository__pb2.DeleteRepoResponse.SerializeToString,
             ),
             'MergeRepo': grpc.unary_unary_rpc_method_handler(
                     servicer.MergeRepo,
@@ -422,6 +438,33 @@ class RepositoryService(object):
             '/repository.RepositoryService/CreateTag',
             repository__pb2.CreateTagRequest.SerializeToString,
             repository__pb2.CreateTagResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteRepo(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/repository.RepositoryService/DeleteRepo',
+            repository__pb2.DeleteRepoRequest.SerializeToString,
+            repository__pb2.DeleteRepoResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -190,6 +190,36 @@ class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
             context.set_details(str(e))
             return repository_pb2.ListReposResponse()
 
+    def DeleteRepo(self, request, context):
+        try:
+            repo_key = f"{request.namespace}/{request.repo_name}"
+            repo_path = os.path.abspath(os.path.join(self.git.base_dir, f"{repo_key}.git"))
+            print(f"DEBUG: Attempting to delete repo at {repo_path}")
+            
+            if not os.path.exists(repo_path):
+                print(f"DEBUG: Repo path does not exist: {repo_path}")
+                context.set_code(grpc.StatusCode.NOT_FOUND)
+                context.set_details(f"Repository not found: {repo_key}")
+                return repository_pb2.DeleteRepoResponse(success=False, message="Repository not found")
+
+            # Remove the repository directory
+            import shutil
+            shutil.rmtree(repo_path)
+            print(f"DEBUG: Successfully removed directory: {repo_path}")
+            
+            # Also clean up any potential temp index files
+            temp_index_prefix = os.path.abspath(os.path.join(self.git.base_dir, f"index_{request.namespace}_{request.repo_name}"))
+            if os.path.exists(temp_index_prefix):
+                os.remove(temp_index_prefix)
+                print(f"DEBUG: Removed temp index: {temp_index_prefix}")
+
+            return repository_pb2.DeleteRepoResponse(success=True, message="Repository deleted successfully")
+        except Exception as e:
+            print(f"DEBUG: Error in DeleteRepo: {str(e)}")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return repository_pb2.DeleteRepoResponse(success=False, message=str(e))
+
     def CheckoutView(self, request, context):
         try:
             repo_path = os.path.join(

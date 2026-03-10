@@ -89,6 +89,11 @@ class CloneRepoRequest(BaseModel):
     repo_name: str
 
 
+class DeleteRepoRequest(BaseModel):
+    namespace: str
+    repo_name: str
+
+
 @app.post("/repo/init")
 async def init_repo(namespace: str, repo_name: str):
     """Initialize a new personal repository."""
@@ -260,6 +265,17 @@ async def list_repos(namespace: str):
     request = repository_pb2.ListReposRequest(namespace=namespace)
     response = stub.ListRepos(request)
     return {"repo_names": list(response.repo_names)}
+
+
+@app.delete("/repo/delete")
+async def delete_repo(namespace: str, repo_name: str):
+    """Delete a repository."""
+    stub = router.get_client_stub(namespace)
+    request = repository_pb2.DeleteRepoRequest(namespace=namespace, repo_name=repo_name)
+    response = stub.DeleteRepo(request)
+    if not response.success:
+        raise HTTPException(status_code=500, detail=response.message)
+    return {"success": True, "message": response.message}
 
 
 @app.get("/repo/refs")

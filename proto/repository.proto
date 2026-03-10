@@ -12,6 +12,7 @@ service RepositoryService {
   rpc ListFiles (ListFilesRequest) returns (ListFilesResponse);
   rpc ListRepos (ListReposRequest) returns (ListReposResponse);
   rpc CreateTag (CreateTagRequest) returns (CreateTagResponse);
+  rpc DeleteRepo (DeleteRepoRequest) returns (DeleteRepoResponse);
   
   // Phase 4: Integration
   rpc MergeRepo (MergeRepoRequest) returns (MergeRepoResponse);
@@ -165,6 +166,16 @@ message CreateTagRequest {
 }
 
 message CreateTagResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message DeleteRepoRequest {
+  string namespace = 1;
+  string repo_name = 2;
+}
+
+message DeleteRepoResponse {
   bool success = 1;
   string message = 2;
 }
