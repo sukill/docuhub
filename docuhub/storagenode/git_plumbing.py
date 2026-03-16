@@ -1,5 +1,8 @@
 import subprocess
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class RefNotFoundError(Exception):
@@ -19,6 +22,12 @@ class RepoNotFoundError(Exception):
     def __init__(self, repo_path):
         self.repo_path = repo_path
         super().__init__(f"Repository at {repo_path} not found")
+
+
+class EmptyRepositoryError(Exception):
+    def __init__(self, repo_path):
+        self.repo_path = repo_path
+        super().__init__(f"Repository at {repo_path} is completely empty (no commits yet)")
 
 
 class GitPlumbing:
@@ -184,16 +193,22 @@ class GitPlumbing:
             output = self._run_git(repo_path, ["rev-parse", ref])
             return output.decode("utf-8").strip()
         except Exception:
-            print("rev-parse failed")
+            # Lower logging Level to DEBUG as missing refs are common/expected in many states
+            logger.debug(f"rev-parse failed for ref: {ref} in repo: {repo_path}")
             return None
 
     def get_tree(self, repo_path, ref):
-        # git ls-tree -r <ref>
+        # 1. First check if the ref exists via get_ref (which logs at DEBUG level)
+        if not self.get_ref(repo_path, ref):
+            return []
+
+        # 2. git ls-tree -r <ref>
         try:
             output = self._run_git(repo_path, ["ls-tree", "-r", ref])
-            return output.decode("utf-8").strip().split("\n")
+            content = output.decode("utf-8").strip()
+            return content.split("\n") if content else []
         except Exception:
-            print("ls-tree failed")
+            logger.debug(f"ls-tree failed for ref: {ref} in repo: {repo_path}")
             return []
 
     def merge_ref(self, repo_path, src_ref, dest_ref, message="Merge"):
@@ -265,6 +280,8 @@ class GitPlumbing:
 
         # 2. Check if ref exists
         if not self.get_ref(repo_path, ref):
+            if not self.list_refs(repo_path):
+                raise EmptyRepositoryError(repo_path)
             raise RefNotFoundError(ref)
 
         # 3. git cat-file -p <ref>:<path>

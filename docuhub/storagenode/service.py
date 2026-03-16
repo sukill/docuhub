@@ -6,7 +6,7 @@ from concurrent import futures
 import redis
 from docuhub.generated import repository_pb2
 from docuhub.generated import repository_pb2_grpc
-from .git_plumbing import GitPlumbing, RefNotFoundError, PathNotFoundError, RepoNotFoundError
+from .git_plumbing import GitPlumbing, RefNotFoundError, PathNotFoundError, RepoNotFoundError, EmptyRepositoryError
 from .auth import AuthHelper
 
 
@@ -172,7 +172,7 @@ class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
                 for e in entries
             ]
             return repository_pb2.ListFilesResponse(entries=proto_entries)
-        except (RefNotFoundError, PathNotFoundError, RepoNotFoundError) as e:
+        except (RefNotFoundError, PathNotFoundError, RepoNotFoundError, EmptyRepositoryError) as e:
             context.set_code(grpc.StatusCode.NOT_FOUND)
             context.set_details(str(e))
             return repository_pb2.ListFilesResponse()
@@ -231,7 +231,7 @@ class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
             chunk_size = 1024 * 1024
             for i in range(0, len(content), chunk_size):
                 yield repository_pb2.FileContent(chunk=content[i : i + chunk_size])
-        except (RefNotFoundError, PathNotFoundError, RepoNotFoundError) as e:
+        except (RefNotFoundError, PathNotFoundError, RepoNotFoundError, EmptyRepositoryError) as e:
             context.set_code(grpc.StatusCode.NOT_FOUND)
             context.set_details(str(e))
         except Exception as e:
