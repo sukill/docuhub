@@ -16,7 +16,7 @@ DocuHub은 분산 Git 기반의 가이드라인 저장소 시스템입니다. �
 - **URL**: `/repo/init`
 - **Method**: `POST`
 - **Query Parameters**:
-  - `user_id` (string, required): 사용자 식별자
+  - `namespace` (string, required): 사용자/조직 네임스페이스
   - `repo_name` (string, required): 저장소 이름
 - **Response**:
   ```json
@@ -36,7 +36,7 @@ DocuHub은 분산 Git 기반의 가이드라인 저장소 시스템입니다. �
   ```json
   {
     "remote_url": "https://github.com/user/repo.git",
-    "user_id": "target_user",
+    "namespace": "target_namespace",
     "repo_name": "target_repo"
   }
   ```
@@ -57,9 +57,9 @@ DocuHub은 분산 Git 기반의 가이드라인 저장소 시스템입니다. �
 - **Request Body**:
   ```json
   {
-    "src_user_id": "upstream_user",
+    "src_namespace": "upstream_namespace",
     "src_repo_name": "guideline_repo",
-    "dest_user_id": "personal_user",
+    "dest_namespace": "personal_namespace",
     "dest_repo_name": "my_guideline"
   }
   ```
@@ -83,7 +83,7 @@ DocuHub은 분산 Git 기반의 가이드라인 저장소 시스템입니다. �
 - **Request Body**:
   ```json
   {
-    "user_id": "user123",
+    "namespace": "namespace123",
     "repo_name": "guideline",
     "target_ref": "main",
     "commit_message": "Update docs",
@@ -115,10 +115,10 @@ DocuHub은 분산 Git 기반의 가이드라인 저장소 시스템입니다. �
 - **Request Body**:
   ```json
   {
-    "src_user_id": "personal_user",
+    "src_namespace": "personal_namespace",
     "src_repo_name": "my_guideline",
     "src_ref": "main",
-    "dest_user_id": "upstream_user",
+    "dest_namespace": "upstream_namespace",
     "dest_repo_name": "guideline_repo",
     "dest_ref": "main"
   }
@@ -142,7 +142,7 @@ DocuHub은 분산 Git 기반의 가이드라인 저장소 시스템입니다. �
 - **URL**: `/repo/tag`
 - **Method**: `POST`
 - **Query Parameters**:
-  - `user_id` (string, required): 사용자 식별자
+  - `namespace` (string, required): 사용자/조직 네임스페이스
   - `repo_name` (string, required): 저장소 이름
   - `tag_name` (string, required): 태그 이름 (예: v1.0.0)
   - `target_ref` (string, optional): 대상 Ref (기본값: main)
@@ -160,10 +160,11 @@ DocuHub은 분산 Git 기반의 가이드라인 저장소 시스템입니다. �
 - **URL**: `/repo/files`
 - **Method**: `GET`
 - **Query Parameters**:
-  - `user_id` (string, required)
+  - `namespace` (string, required)
   - `repo_name` (string, required)
   - `ref` (string, optional): 브랜치나 태그 (기본값: main)
   - `path` (string, optional): 조회 경로 (기본값: "")
+- **Note**: 저장소에 커밋이 없는 경우 빈 배열(`[]`)을 반환합니다.
 - **Response**:
   ```json
   {
@@ -179,19 +180,83 @@ DocuHub은 분산 Git 기반의 가이드라인 저장소 시스템입니다. �
   ```
 
 ### 3-3. 파일 내용 조회 (Read File)
-특정 파일의 전체 텍스트 내용을 조회합니다.
+특정 리비전 및 경로의 파일 내용을 조회합니다.
 
 - **URL**: `/repo/file`
 - **Method**: `GET`
 - **Query Parameters**:
-  - `user_id` (string, required)
+  - `namespace` (string, required)
   - `repo_name` (string, required)
   - `ref` (string, optional): 브랜치나 태그 (기본값: main)
-  - `path` (string, optional): 파일 경로 (기본값: "")
+  - `path` (string, optional): 조회할 파일 경로 (기본값: "")
+- **Note**: 리포지토리는 존재하지만 커밋이 전혀 없는 경우 `404 Not Found` (Empty Repository)를 반환합니다.
 - **Response**:
   ```json
   {
     "success": true,
-    "content": "File content string..."
+    "content": "# Document Title\n\nContent..."
   }
   ```
+
+---
+
+## 4. 기타 저장소 기능 (Miscellaneous)
+
+### 4-1. 저장소 목록 조회 (List Repos)
+특정 네임스페이스에 존재하는 모든 저장소 목록을 조회합니다.
+
+- **URL**: `/repo/list`
+- **Method**: `GET`
+- **Query Parameters**:
+  - `namespace` (string, required)
+- **Response**:
+  ```json
+  {
+    "repo_names": [
+      "guideline1",
+      "guideline2"
+    ]
+  }
+  ```
+
+### 4-2. 저장소 삭제 (Delete Repo)
+특정 저장소를 삭제합니다.
+
+- **URL**: `/repo/delete`
+- **Method**: `DELETE`
+- **Query Parameters**:
+  - `namespace` (string, required)
+  - `repo_name` (string, required)
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Repository deleted successfully"
+  }
+  ```
+
+### 4-3. 저장소 브랜치 및 태그 조회 (List Refs)
+저장소의 모든 브랜치와 태그 목록을 조회합니다.
+
+- **URL**: `/repo/refs`
+- **Method**: `GET`
+- **Query Parameters**:
+  - `namespace` (string, required)
+  - `repo_name` (string, required)
+- **Response**:
+  ```json
+  {
+    "refs": [
+      {
+        "name": "main",
+        "type": "commit"
+      },
+      {
+        "name": "v1.0.0",
+        "type": "tag"
+      }
+    ]
+  }
+  ```
+
+
