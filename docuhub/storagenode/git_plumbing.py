@@ -244,7 +244,8 @@ class GitPlumbing:
             output = self._run_git(repo_path, args)
         except Exception as e:
             # If ls-tree fails but ref exists, it's likely a path error
-            if "fatal: Not a valid object name" in str(e) or "fatal: not a tree object" in str(e):
+            err_str = str(e)
+            if "fatal: Not a valid object name" in err_str or "fatal: not a tree object" in err_str or "does not exist in" in err_str:
                 raise PathNotFoundError(ref, path)
             raise e
 
@@ -285,11 +286,13 @@ class GitPlumbing:
             raise RefNotFoundError(ref)
 
         # 3. git cat-file -p <ref>:<path>
-        args = ["cat-file", "-p", f"{ref}:{path}"]
+        # -c core.quotepath=false ensures non-ASCII paths are handled correctly
+        args = ["-c", "core.quotepath=false", "cat-file", "-p", f"{ref}:{path}"]
         try:
             return self._run_git(repo_path, args)
         except Exception as e:
-            if "fatal: Not a valid object name" in str(e):
+            err_str = str(e)
+            if "fatal: Not a valid object name" in err_str or "does not exist in" in err_str:
                 raise PathNotFoundError(ref, path)
             raise e
 

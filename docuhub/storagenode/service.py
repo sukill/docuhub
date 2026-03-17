@@ -234,6 +234,7 @@ class RepositoryService(repository_pb2_grpc.RepositoryServiceServicer):
         except (RefNotFoundError, PathNotFoundError, RepoNotFoundError, EmptyRepositoryError) as e:
             context.set_code(grpc.StatusCode.NOT_FOUND)
             context.set_details(str(e))
+            raise e
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
