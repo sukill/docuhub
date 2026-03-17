@@ -28,7 +28,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         if code == grpc.StatusCode.NOT_FOUND:
             status_code = 404
             detail = exc.details()
-            logger.warning(f"Resource not found via gRPC: {detail}")
+            logger.debug(f"Resource not found via gRPC: {detail}")
         elif code == grpc.StatusCode.UNAVAILABLE:
             status_code = 503
             detail = "Storage node unavailable"
@@ -226,17 +226,22 @@ async def list_files(namespace: str, repo_name: str, ref: str = "main", path: st
     request = repository_pb2.ListFilesRequest(
         namespace=namespace, repo_name=repo_name, ref=ref, path=path
     )
-    response = stub.ListFiles(request)
-    entries = [
-        {
-            "name": e.name,
-            "is_dir": e.is_dir,
-            "size": e.size,
-            "commit_hash": e.commit_hash,
-        }
-        for e in response.entries
-    ]
-    return {"entries": entries}
+    try:
+        response = stub.ListFiles(request)
+        entries = [
+            {
+                "name": e.name,
+                "is_dir": e.is_dir,
+                "size": e.size,
+                "commit_hash": e.commit_hash,
+            }
+            for e in response.entries
+        ]
+        return {"entries": entries}
+    except grpc.RpcError as e:
+        if e.code() == grpc.StatusCode.NOT_FOUND:
+            raise HTTPException(status_code=404, detail="Path not found")
+        raise e
 
 
 @app.get("/repo/file")
@@ -249,8 +254,13 @@ async def read_file(namespace: str, repo_name: str, ref: str = "main", path: str
 
     content = b""
     # CheckoutView returns a stream of FileContent
-    for response in stub.CheckoutView(request):
-        content += response.chunk
+    try:
+        for response in stub.CheckoutView(request):
+            content += response.chunk
+    except grpc.RpcError as e:
+        if e.code() == grpc.StatusCode.NOT_FOUND:
+            raise HTTPException(status_code=404, detail="File not found")
+        raise e
 
     return {
         "success": True,
